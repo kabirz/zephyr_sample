@@ -1,0 +1,81 @@
+diff --git a/boards/arm/nucleo_h743zi/Kconfig.board b/boards/arm/nucleo_h743zi/Kconfig.board
+index 9417b98e67..3e6eb5f78c 100644
+--- a/boards/arm/nucleo_h743zi/Kconfig.board
++++ b/boards/arm/nucleo_h743zi/Kconfig.board
+@@ -6,3 +6,4 @@
+ config BOARD_NUCLEO_H743ZI
+ 	bool "Nucleo H743ZI Development Board"
+ 	depends on SOC_STM32H743XX
++	select HAS_COVERAGE_SUPPORT
+diff --git a/cmake/compiler/gcc/compiler_flags.cmake b/cmake/compiler/gcc/compiler_flags.cmake
+index 11377ab54c..1eb51b9e4c 100644
+--- a/cmake/compiler/gcc/compiler_flags.cmake
++++ b/cmake/compiler/gcc/compiler_flags.cmake
+@@ -138,7 +138,7 @@ set_property(TARGET compiler-cpp PROPERTY no_rtti "-fno-rtti")
+ ###################################################
+ 
+ # gcc flags for coverage generation
+-set_compiler_property(PROPERTY coverage -fprofile-arcs -ftest-coverage -fno-inline)
++#set_compiler_property(PROPERTY coverage -fprofile-arcs -ftest-coverage -fno-inline)
+ 
+ # Security canaries.
+ set_compiler_property(PROPERTY security_canaries -fstack-protector-all)
+diff --git a/cov.sh b/cov.sh
+new file mode 100755
+index 0000000000..d1954707d2
+--- /dev/null
++++ b/cov.sh
+@@ -0,0 +1,2 @@
++west build -b nucleo_h743zi samples/basic/blinky -- -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  -DCONFIG_COVERAGE=y -DCONFIG_COVERAGE_DUMP=y
++west flash
+diff --git a/drivers/CMakeLists.txt b/drivers/CMakeLists.txt
+index 07cd26955b..494a3bd51a 100644
+--- a/drivers/CMakeLists.txt
++++ b/drivers/CMakeLists.txt
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ 
+ add_definitions(-D__ZEPHYR_SUPERVISOR__)
++add_compile_options(-fprofile-arcs -ftest-coverage)
+ 
+ add_subdirectory(console)
+ add_subdirectory(interrupt_controller)
+diff --git a/gen.sh b/gen.sh
+new file mode 100755
+index 0000000000..10bd80e4a5
+--- /dev/null
++++ b/gen.sh
+@@ -0,0 +1,12 @@
++scripts/gen_gcov_files.py -i a.log
++# methed 1
++lcov -c -d build -o a.info -q --rc lcov_branch_coverage=1 2>/dev/null
++rm lcov_html -fr
++genhtml a.info -o lcov_html -q --ignore-errors source --branch-coverage --highlight --legend
++# methed 2
++rm gcov_out -fr
++mkdir gcov_out
++pushd build >/dev/null
++gcovr -r ${ZEPHYR_BASE} --html -o ../gcov_out/index.html --html-details --gcov-executable ${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcov
++popd >/dev/null
++rm a.info
+diff --git a/samples/basic/blinky/src/main.c b/samples/basic/blinky/src/main.c
+index e2fbfd3dc5..3d8a68ac29 100644
+--- a/samples/basic/blinky/src/main.c
++++ b/samples/basic/blinky/src/main.c
+@@ -30,6 +30,7 @@
+ void main(void)
+ {
+ 	const struct device *dev;
++	int i = 5;
+ 	bool led_is_on = true;
+ 	int ret;
+ 
+@@ -43,7 +44,7 @@ void main(void)
+ 		return;
+ 	}
+ 
+-	while (1) {
++	while (i--) {
+ 		gpio_pin_set(dev, PIN, (int)led_is_on);
+ 		led_is_on = !led_is_on;
+ 		k_msleep(SLEEP_TIME_MS);
